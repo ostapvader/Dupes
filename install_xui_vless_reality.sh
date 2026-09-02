@@ -4,7 +4,7 @@ set -e
 echo "=== Установка x-ui v2.3.12 с Xray 1.8.23 и VLESS Reality ==="
 
 if [ "$EUID" -ne 0 ]; then 
-    echo "Пожалуйста, запустите от имени root"
+    echo "Пожалуйста, запустите скрипт от имени root"
     exit 1
 fi
 
@@ -18,20 +18,17 @@ bash <(curl -Ls https://raw.githubusercontent.com/MHSanaei/3x-ui/master/install.
 echo "Остановка службы x-ui..."
 systemctl stop x-ui
 
-# === ИСПРАВЛЕННЫЙ БЛОК ЗАМЕНЫ БИНАРНИКА (строго для amd64) ===
+echo "Настройка панели (убираем 404, ставим webBasePath /)..."
+x-ui setting -username admin -password admin -webBasePath / > /dev/null 2>&1
+
 echo "Замена ядра Xray на версию 1.8.23 (linux-64)..."
 cd /usr/local/x-ui/bin
 rm -f xray-linux-amd64
-
-# Скачиваем архив
 wget -q https://github.com/XTLS/Xray-core/releases/download/v1.8.23/Xray-linux-64.zip
-
-# Внутри архива файл называется просто "xray". Извлекаем его и переименовываем в то, что ждет панель
 unzip -o Xray-linux-64.zip xray
 mv xray xray-linux-amd64
 rm -f Xray-linux-64.zip
 chmod +x xray-linux-amd64
-# ================================================================
 
 echo "Генерация ключей Reality..."
 REALITY_KEYS=$(/usr/local/x-ui/bin/xray-linux-amd64 x25519)
@@ -48,17 +45,15 @@ echo "Short ID: $SHORT_ID"
 echo "UUID: $UUID"
 echo ""
 
-echo "Установка учетных данных панели (admin/admin)..."
-# Используем штатную команду CLI, так как прямая запись в sqlite3 не хеширует пароль
-x-ui setting -username admin -password admin > /dev/null 2>&1
-
 echo "Создание inbound VLESS Reality на порту 443..."
-sqlite3 /etc/x-ui/x-ui.db "DELETE FROM inbounds"
+sqlite3 /etc/x-ui/x-ui.db "DELETE FROM inbounds WHERE port = 443;"
+
+# ВАЖНО: JSON теперь чистый, без полей, которые ломают Xray (exit 255)
 sqlite3 /etc/x-ui/x-ui.db "INSERT INTO inbounds (user_id, up, down, total, remark, enable, expiry_time, listen, port, protocol, settings, stream_settings, tag, sniffing) VALUES (
 1, 0, 0, 0, 'VLESS Reality', 1, 0, '', 443, 'vless',
-'{\"clients\":[{\"id\":\"$UUID\",\"flow\":\"xtls-rprx-vision\",\"email\":\"user1\",\"enable\":true,\"expiryTime\":0,\"totalGB\":0,\"reset\":0,\"limitIp\":0}],\"decryption\":\"none\"}',
+'{\"clients\":[{\"id\":\"$UUID\",\"flow\":\"xtls-rprx-vision\",\"email\":\"user1\"}],\"decryption\":\"none\"}',
 '{\"network\":\"tcp\",\"security\":\"reality\",\"realitySettings\":{\"show\":false,\"dest\":\"dl.google.com:443\",\"xver\":0,\"serverNames\":[\"google.com\",\"www.google.com\",\"android.com\"],\"privateKey\":\"$PRIVATE_KEY\",\"shortIds\":[\"$SHORT_ID\"],\"settings\":{\"publicKey\":\"$PUBLIC_KEY\",\"fingerprint\":\"chrome\"}},\"tcpSettings\":{\"acceptProxyProtocol\":false,\"header\":{\"type\":\"none\"}}}',
-'inbound-443', '{\"enabled\":true,\"destOverride\":[\"http\",\"tls\",\"quic\",\"fakedns\"]}')"
+'inbound-443', '{\"enabled\":true,\"destOverride\":[\"http\",\"tls\",\"quic\",\"fakedns\"]}');"
 
 echo "Настройка брандмауэра (UFW)..."
 ufw allow 22/tcp
@@ -77,13 +72,14 @@ echo ""
 echo "========================================"
 echo "=== Установка успешно завершена! ==="
 echo "========================================"
-echo "URL панели: http://$SERVER_IP:2053/"
+echo ""
+echo "URL панели: http://$SERVER_IP:2053/   <-- Теперь открывается без 404!"
 echo "Логин: admin"
 echo "Пароль: admin"
 echo ""
-echo "VLESS Reality Config:"
-echo "  Address: $SERVER_IP"
-echo "  Port: 443"
+echo "Конфигурация VLESS Reality:"
+echo "  Адрес: $SERVER_IP"
+echo "  Порт: 443"
 echo "  UUID: $UUID"
 echo "  Flow: xtls-rprx-vision"
 echo "  Security: reality"
@@ -94,4 +90,7 @@ echo "  Short ID: $SHORT_ID"
 echo ""
 echo "Xray version:"
 /usr/local/x-ui/bin/xray-linux-amd64 version | head -1
+echo ""
+echo "Статус панели и Xray:"
+x-ui status
 echo "========================================"
