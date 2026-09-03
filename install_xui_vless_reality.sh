@@ -44,12 +44,11 @@ UUID=$(cat /proc/sys/kernel/random/uuid)
 sqlite3 /etc/x-ui/x-ui.db "DELETE FROM inbounds WHERE port = 443;"
 sqlite3 /etc/x-ui/x-ui.db "INSERT INTO inbounds (user_id, up, down, total, remark, enable, expiry_time, listen, port, protocol, settings, stream_settings, tag, sniffing) VALUES (
 1, 0, 0, 0, 'VLESS Reality', 1, 0, '', 443, 'vless',
-'{\"clients\":[{\"id\":\"$UUID\",\"flow\":\"xtls-rprx-vision:443\",\"email\":\"user1\"}],\"decryption\":\"none\"}',
-'{\"network\":\"tcp\",\"security\":\"reality\",\"realitySettings\":{\"show\":false,\"dest\":\"dl.google.com:443\",\"xver\":0,\"serverNames\":[\"google.com\",\"www.google.com\",\"android.com\"],\"privateKey\":\"$PRIVATE_KEY\",\"shortIds\":[\"$SHORT_ID\"]},\"tcpSettings\":{\"acceptProxyProtocol\":false,\"header\":{\"type\":\"none\"}}}',
+'{\"clients\":[{\"id\":\"'$UUID'\",\"flow\":\"xtls-rprx-vision-udp443\",\"email\":\"user1\"}],\"decryption\":\"none\"}',
+'{\"network\":\"tcp\",\"security\":\"reality\",\"realitySettings\":{\"show\":false,\"dest\":\"dl.google.com:443\",\"xver\":0,\"serverNames\":[\"google.com\",\"www.google.com\",\"android.com\"],\"privateKey\":\"'$PRIVATE_KEY'\",\"shortIds\":[\"'$SHORT_ID'\"]},\"tcpSettings\":{\"acceptProxyProtocol\":false,\"header\":{\"type\":\"none\"}}}',
 'inbound-443', '{\"enabled\":true,\"destOverride\":[\"http\",\"tls\",\"quic\"]}');"
 
 echo "[6/7] Удаление старого конфига и перезапуск..."
-# ВАЖНО: удаляем конфиг чтобы панель создала новый под 1.8.23
 rm -f /usr/local/x-ui/bin/config.json
 x-ui restart
 
@@ -58,6 +57,7 @@ ufw allow 22/tcp
 ufw allow 443/tcp
 ufw allow $RANDOM_PORT/tcp
 ufw --force enable
+ufw reload
 
 sleep 5
 
@@ -76,7 +76,7 @@ echo "⚙️ Конфигурация VLESS Reality:"
 echo "  Адрес: $SERVER_IP"
 echo "  Порт: 443"
 echo "  UUID: $UUID"
-echo "  Flow: xtls-rprx-vision:443"
+echo "  Flow: xtls-rprx-vision-udp443"
 echo "  Security: reality"
 echo "  SNI: google.com"
 echo "  Fingerprint: chrome"
