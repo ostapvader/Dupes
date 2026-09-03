@@ -44,8 +44,8 @@ UUID=$(cat /proc/sys/kernel/random/uuid)
 sqlite3 /etc/x-ui/x-ui.db "DELETE FROM inbounds WHERE port = 443;"
 sqlite3 /etc/x-ui/x-ui.db "INSERT INTO inbounds (user_id, up, down, total, remark, enable, expiry_time, listen, port, protocol, settings, stream_settings, tag, sniffing) VALUES (
 1, 0, 0, 0, 'VLESS Reality', 1, 0, '', 443, 'vless',
-'{\"clients\":[{\"id\":\"'$UUID'\",\"flow\":\"xtls-rprx-vision-udp443\",\"email\":\"user1\"}],\"decryption\":\"none\"}',
-'{\"network\":\"tcp\",\"security\":\"reality\",\"realitySettings\":{\"show\":false,\"dest\":\"dl.google.com:443\",\"xver\":0,\"serverNames\":[\"google.com\",\"www.google.com\",\"android.com\"],\"privateKey\":\"'$PRIVATE_KEY'\",\"shortIds\":[\"'$SHORT_ID'\"]},\"tcpSettings\":{\"acceptProxyProtocol\":false,\"header\":{\"type\":\"none\"}}}',
+'{\"clients\":[{\"id\":\"'"$UUID"'\",\"flow\":\"xtls-rprx-vision-udp443\",\"email\":\"user1\"}],\"decryption\":\"none\"}',
+'{\"network\":\"tcp\",\"security\":\"reality\",\"realitySettings\":{\"show\":false,\"dest\":\"dl.google.com:443\",\"xver\":0,\"serverNames\":[\"google.com\",\"www.google.com\",\"android.com\"],\"privateKey\":\"'"$PRIVATE_KEY"'\",\"shortIds\":[\"'"$SHORT_ID"'\"]},\"tcpSettings\":{\"acceptProxyProtocol\":false,\"header\":{\"type\":\"none\"}}}',
 'inbound-443', '{\"enabled\":true,\"destOverride\":[\"http\",\"tls\",\"quic\"]}');"
 
 echo "[6/7] Удаление старого конфига и перезапуск..."
