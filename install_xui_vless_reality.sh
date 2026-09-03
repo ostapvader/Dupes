@@ -10,7 +10,7 @@ fi
 
 RANDOM_PORT=$((RANDOM % 55001 + 10000))
 RANDOM_PASSWORD=$(openssl rand -base64 12 | tr -d '/+=' | head -c 16)
-RANDOM_PATH="/$(openssl rand -hex 8)/"
+RANDOM_PATH="$(openssl rand -hex 8)"
 
 echo "[1/9] Включение BBR..."
 if ! sysctl net.ipv4.tcp_congestion_control | grep -q bbr; then
@@ -26,18 +26,17 @@ echo "[2/9] Обновление системы и установка завис
 apt-get update -qq
 apt-get install -y curl wget sqlite3 ufw unzip
 
-echo "[3/9] Установка x-ui v2.3.12 (без автоматического SSL, отвечаем 'n' на промпты)..."
-# install.sh сам спрашивает про порт/логин/сертификат — отвечаем "n" на всё, чтобы не тратить время на автогенерацию LE-сертификата
+echo "[3/9] Установка x-ui v2.3.12 (без автоматического SSL)..."
 yes n | bash <(curl -Ls https://raw.githubusercontent.com/MHSanaei/3x-ui/master/install.sh) v2.3.12 || true
 
-echo "[4/9] Остановка панели и полная очистка старых настроек..."
-x-ui stop
+echo "[4/9] Остановка панели..."
+systemctl stop x-ui
 sleep 1
-sqlite3 /etc/x-ui/x-ui.db "DELETE FROM settings WHERE key IN ('webCertFile','webKeyFile');" 2>/dev/null || true
 
-echo "[5/9] Установка порта, логина, пароля и пути панели (HTTP, без SSL)..."
-x-ui setting -port "$RANDOM_PORT" -username admin -password "$RANDOM_PASSWORD" -webBasePath "$RANDOM_PATH" > /dev/null 2>&1
-# Повторно чистим сертификаты на случай, если setting их не тронул
+echo "[5/9] Установка порта, логина, пароля, пути (через официальный бинарник x-ui)..."
+/usr/local/x-ui/x-ui setting -port "$RANDOM_PORT" -username admin -password "$RANDOM_PASSWORD" -webBasePath "$RANDOM_PATH"
+
+# Убираем сертификаты, если install.sh что-то успел прописать
 sqlite3 /etc/x-ui/x-ui.db "DELETE FROM settings WHERE key IN ('webCertFile','webKeyFile');" 2>/dev/null || true
 
 echo "[6/9] Замена ядра Xray на версию 1.8.23 (linux-64)..."
@@ -81,15 +80,22 @@ ufw allow "$RANDOM_PORT"/tcp
 ufw --force enable
 ufw reload
 
-x-ui start
+systemctl restart x-ui
 sleep 5
 
-echo "[9/9] Финальная проверка реальных настроек из базы..."
-ACTUAL_PORT=$(sqlite3 /etc/x-ui/x-ui.db "SELECT value FROM settings WHERE key='webPort';")
-ACTUAL_PATH=$(sqlite3 /etc/x-ui/x-ui.db "SELECT value FROM settings WHERE key='webBasePath';")
-ACTUAL_CERT=$(sqlite3 /etc/x-ui/x-ui.db "SELECT value FROM settings WHERE key='webCertFile';")
-SCHEME="http"
-[ -n "$ACTUAL_CERT" ] && SCHEME="https"
+echo "[9/9] Получение РЕАЛЬНЫХ настроек панели через x-ui setting -show..."
+PANEL_INFO=$(/usr/local/x-ui/x-ui setting -show true)
+echo "$PANEL_INFO"
+
+ACTUAL_PORT=$(echo "$PANEL_INFO" | grep -Eo 'port: .+' | awk '{print $2}')
+ACTUAL_PATH=$(echo "$PANEL_INFO" | grep -Eo 'webBasePath: .+' | awk '{print $2}')
+
+# Fallback на прямой сокет, если парсинг вывода не сработал
+if [ -z "$ACTUAL_PORT" ]; then
+    ACTUAL_PORT=$(ss -tlnp 2>/dev/null | grep '"x-ui"' | grep -oP ':\K[0-9]+' | head -1)
+fi
+[ -z "$ACTUAL_PORT" ] && ACTUAL_PORT="$RANDOM_PORT"
+[ -z "$ACTUAL_PATH" ] && ACTUAL_PATH="/$RANDOM_PATH/"
 
 SERVER_IP=$(curl -s ifconfig.me)
 
@@ -98,7 +104,7 @@ echo "========================================"
 echo "=== УСТАНОВКА ЗАВЕРШЕНА ==="
 echo "========================================"
 echo ""
-echo "🌐 URL панели: ${SCHEME}://${SERVER_IP}:${ACTUAL_PORT}${ACTUAL_PATH}"
+echo "🌐 URL панели: http://${SERVER_IP}:${ACTUAL_PORT}${ACTUAL_PATH}"
 echo "👤 Логин: admin"
 echo "🔑 Пароль: $RANDOM_PASSWORD"
 echo ""
@@ -119,5 +125,6 @@ echo "📦 Версия Xray:"
 /usr/local/x-ui/bin/xray-linux-amd64 version | head -1
 echo ""
 echo "📊 Статус:"
-x-ui status | grep -E "Active:|xray state"
+systemctl status x-ui | grep -E "Active:" 
+ps -ef | grep "xray-linux" | grep -v grep > /dev/null && echo "xray state: Running" || echo "xray state: Not Running"
 echo "========================================"
