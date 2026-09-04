@@ -59,9 +59,11 @@ PUBLIC_KEY=$(echo "$REALITY_KEYS" | grep "Public key:" | awk '{print $3}')
 SHORT_ID=$(openssl rand -hex 8)
 UUID=$(cat /proc/sys/kernel/random/uuid)
 
-# ВАЖНО: добавляем settings.publicKey и settings.fingerprint в realitySettings
 SETTINGS_JSON=$(printf '{"clients":[{"id":"%s","flow":"xtls-rprx-vision-udp443","email":"user1"}],"decryption":"none"}' "$UUID")
 STREAM_JSON=$(printf '{"network":"tcp","security":"reality","realitySettings":{"show":false,"dest":"dl.google.com:443","xver":0,"serverNames":["www.google.com","google.com","android.com"],"privateKey":"%s","shortIds":["%s"],"settings":{"publicKey":"%s","fingerprint":"chrome"}},"tcpSettings":{"acceptProxyProtocol":false,"header":{"type":"none"}}}' "$PRIVATE_KEY" "$SHORT_ID" "$PUBLIC_KEY")
+
+# Routing с правилом direct для geoip:ru И .ru доменов (как на рабочем сервере)
+ROUTING_JSON='{"domainStrategy":"AsIs","rules":[{"type":"field","inboundTag":["api"],"outboundTag":"api"},{"type":"field","outboundTag":"direct","ip":["geoip:ru"]},{"type":"field","outboundTag":"direct","domain":["geosite:category-gov-ru","regexp:.*\\.ru$"]},{"type":"field","outboundTag":"blocked","ip":["geoip:private"]},{"type":"field","outboundTag":"blocked","protocol":["bittorrent"]}]}'
 
 cat > /tmp/xui_insert.sql << EOF
 DELETE FROM inbounds WHERE port = 443;
@@ -72,6 +74,9 @@ EOF
 sqlite3 /etc/x-ui/x-ui.db < /tmp/xui_insert.sql
 rm -f /tmp/xui_insert.sql
 rm -f /usr/local/x-ui/bin/config.json
+
+# Применяем routing из JSON
+sqlite3 /etc/x-ui/x-ui.db "INSERT OR REPLACE INTO settings (key, value) VALUES ('routing', '$ROUTING_JSON');"
 
 echo "[8/9] Настройка брандмауэра и запуск..."
 ufw allow 22/tcp
@@ -117,6 +122,12 @@ echo "  SNI: www.google.com"
 echo "  Fingerprint: chrome"
 echo "  Public Key: $PUBLIC_KEY"
 echo "  Short ID: $SHORT_ID"
+echo ""
+echo "🌍 Routing:"
+echo "   • geoip:ru → direct (IP РФ без прокси)"
+echo "   • *.ru + gov-ru → direct (домены РФ без прокси)"
+echo "   • geoip:private → blocked"
+echo "   • bittorrent → blocked"
 echo ""
 echo "🚀 BBR: $BBR_STATUS"
 echo ""
