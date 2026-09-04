@@ -59,9 +59,9 @@ PUBLIC_KEY=$(echo "$REALITY_KEYS" | grep "Public key:" | awk '{print $3}')
 SHORT_ID=$(openssl rand -hex 8)
 UUID=$(cat /proc/sys/kernel/random/uuid)
 
-# SNI = www.google.com (основной для клиента)
+# ВАЖНО: добавляем settings.publicKey и settings.fingerprint в realitySettings
 SETTINGS_JSON=$(printf '{"clients":[{"id":"%s","flow":"xtls-rprx-vision-udp443","email":"user1"}],"decryption":"none"}' "$UUID")
-STREAM_JSON=$(printf '{"network":"tcp","security":"reality","realitySettings":{"show":false,"dest":"dl.google.com:443","xver":0,"serverNames":["www.google.com","google.com","android.com"],"privateKey":"%s","shortIds":["%s"]},"tcpSettings":{"acceptProxyProtocol":false,"header":{"type":"none"}}}' "$PRIVATE_KEY" "$SHORT_ID")
+STREAM_JSON=$(printf '{"network":"tcp","security":"reality","realitySettings":{"show":false,"dest":"dl.google.com:443","xver":0,"serverNames":["www.google.com","google.com","android.com"],"privateKey":"%s","shortIds":["%s"],"settings":{"publicKey":"%s","fingerprint":"chrome"}},"tcpSettings":{"acceptProxyProtocol":false,"header":{"type":"none"}}}' "$PRIVATE_KEY" "$SHORT_ID" "$PUBLIC_KEY")
 
 cat > /tmp/xui_insert.sql << EOF
 DELETE FROM inbounds WHERE port = 443;
@@ -98,9 +98,6 @@ fi
 
 SERVER_IP=$(curl -s ifconfig.me)
 
-# Генерация клиентской ссылки с правильными параметрами
-CLIENT_LINK="vless://${UUID}@${SERVER_IP}:443?security=reality&sni=www.google.com&fp=chrome&pbk=${PUBLIC_KEY}&sid=${SHORT_ID}&type=tcp&flow=xtls-rprx-vision-udp443#VLESS-Reality"
-
 echo ""
 echo "========================================"
 echo "=== УСТАНОВКА ЗАВЕРШЕНА ==="
@@ -120,9 +117,6 @@ echo "  SNI: www.google.com"
 echo "  Fingerprint: chrome"
 echo "  Public Key: $PUBLIC_KEY"
 echo "  Short ID: $SHORT_ID"
-echo ""
-echo "🔗 Клиентская ссылка (vless://):"
-echo "$CLIENT_LINK"
 echo ""
 echo "🚀 BBR: $BBR_STATUS"
 echo ""
