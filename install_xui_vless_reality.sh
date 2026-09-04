@@ -33,10 +33,9 @@ echo "[4/9] Остановка панели..."
 systemctl stop x-ui
 sleep 1
 
-echo "[5/9] Установка порта, логина, пароля, пути (через официальный бинарник x-ui)..."
+echo "[5/9] Установка порта, логина, пароля, пути..."
 /usr/local/x-ui/x-ui setting -port "$RANDOM_PORT" -username admin -password "$RANDOM_PASSWORD" -webBasePath "$RANDOM_PATH"
 
-# Убираем сертификаты, если install.sh что-то успел прописать
 sqlite3 /etc/x-ui/x-ui.db "DELETE FROM settings WHERE key IN ('webCertFile','webKeyFile');" 2>/dev/null || true
 
 echo "[6/9] Замена ядра Xray на версию 1.8.23 (linux-64)..."
@@ -60,8 +59,9 @@ PUBLIC_KEY=$(echo "$REALITY_KEYS" | grep "Public key:" | awk '{print $3}')
 SHORT_ID=$(openssl rand -hex 8)
 UUID=$(cat /proc/sys/kernel/random/uuid)
 
+# SNI = www.google.com (основной для клиента)
 SETTINGS_JSON=$(printf '{"clients":[{"id":"%s","flow":"xtls-rprx-vision-udp443","email":"user1"}],"decryption":"none"}' "$UUID")
-STREAM_JSON=$(printf '{"network":"tcp","security":"reality","realitySettings":{"show":false,"dest":"dl.google.com:443","xver":0,"serverNames":["google.com","www.google.com","android.com"],"privateKey":"%s","shortIds":["%s"]},"tcpSettings":{"acceptProxyProtocol":false,"header":{"type":"none"}}}' "$PRIVATE_KEY" "$SHORT_ID")
+STREAM_JSON=$(printf '{"network":"tcp","security":"reality","realitySettings":{"show":false,"dest":"dl.google.com:443","xver":0,"serverNames":["www.google.com","google.com","android.com"],"privateKey":"%s","shortIds":["%s"]},"tcpSettings":{"acceptProxyProtocol":false,"header":{"type":"none"}}}' "$PRIVATE_KEY" "$SHORT_ID")
 
 cat > /tmp/xui_insert.sql << EOF
 DELETE FROM inbounds WHERE port = 443;
@@ -83,14 +83,13 @@ ufw reload
 systemctl restart x-ui
 sleep 5
 
-echo "[9/9] Получение РЕАЛЬНЫХ настроек панели через x-ui setting -show..."
+echo "[9/9] Получение настроек панели..."
 PANEL_INFO=$(/usr/local/x-ui/x-ui setting -show true)
 echo "$PANEL_INFO"
 
 ACTUAL_PORT=$(echo "$PANEL_INFO" | grep -Eo 'port: .+' | awk '{print $2}')
 ACTUAL_PATH=$(echo "$PANEL_INFO" | grep -Eo 'webBasePath: .+' | awk '{print $2}')
 
-# Fallback на прямой сокет, если парсинг вывода не сработал
 if [ -z "$ACTUAL_PORT" ]; then
     ACTUAL_PORT=$(ss -tlnp 2>/dev/null | grep '"x-ui"' | grep -oP ':\K[0-9]+' | head -1)
 fi
@@ -98,6 +97,9 @@ fi
 [ -z "$ACTUAL_PATH" ] && ACTUAL_PATH="/$RANDOM_PATH/"
 
 SERVER_IP=$(curl -s ifconfig.me)
+
+# Генерация клиентской ссылки с правильными параметрами
+CLIENT_LINK="vless://${UUID}@${SERVER_IP}:443?security=reality&sni=www.google.com&fp=chrome&pbk=${PUBLIC_KEY}&sid=${SHORT_ID}&type=tcp&flow=xtls-rprx-vision-udp443#VLESS-Reality"
 
 echo ""
 echo "========================================"
@@ -114,10 +116,13 @@ echo "  Порт: 443"
 echo "  UUID: $UUID"
 echo "  Flow: xtls-rprx-vision-udp443"
 echo "  Security: reality"
-echo "  SNI: google.com"
+echo "  SNI: www.google.com"
 echo "  Fingerprint: chrome"
 echo "  Public Key: $PUBLIC_KEY"
 echo "  Short ID: $SHORT_ID"
+echo ""
+echo "🔗 Клиентская ссылка (vless://):"
+echo "$CLIENT_LINK"
 echo ""
 echo "🚀 BBR: $BBR_STATUS"
 echo ""
