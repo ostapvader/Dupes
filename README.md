@@ -6,7 +6,7 @@ FI-R9-2
 249.00 RUB/месяц
 
 копируешь этот скрипт и enter запускаешь
-bash <(curl -Ls https://raw.githubusercontent.com/ostapvader/Dupes/refs/heads/main/install_xui_vless_reality.sh)
+```bash <(curl -Ls https://raw.githubusercontent.com/ostapvader/Dupes/refs/heads/main/install_xui_vless_reality.sh)```
 
 заходишь в панель управления 3X-UI (ссылку, логин и пароль даст скрипт после первой установки) и открываешь qr код из панели управления 3X-UI пользователя во вкладке подключения (нажми на +) 
 
