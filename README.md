@@ -1,5 +1,4 @@
-арендуешь например этот сервер на мес. и выбираешь Ubuntu 24.04 без всяких опций. 
-https://my.xorek.cloud/billmgr?startform=v2.vds.order.pricelist
+регистрируешься https://my.xorek.cloud/billmgr?startform=v2.vds.order.pricelist , потом арендуешь например этот сервер на мес. и выбираешь Ubuntu 24.04 без всяких опций. 
 FI-R9-2
 Дата-центр
 Финляндия
